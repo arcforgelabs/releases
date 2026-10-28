@@ -3,7 +3,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 const DEFAULT_EVIDENCE_REPO = "arcforgelabs/releases";
-const DEFAULT_SOURCE_REPO = "arcforgelabs/flow";
 // Arc Forge has several products and no single source repository, so the
 // release ref and package belong to --source-repo and the @arcforgelabs scope.
 const PACKAGE_SCOPE = "@arcforgelabs/";
@@ -11,11 +10,11 @@ const PACKAGE_SCOPE = "@arcforgelabs/";
 function usage() {
   console.log(`Usage:
   node scripts/arcforge-release-evidence.mjs \\
-    --release-id flow-2026.10.50 \\
+    --release-id explainer-0.1.10 \\
+    --source-repo arcforgelabs/marketplace \\
     --runs-file /tmp/runs.txt \\
-    [--source-repo arcforgelabs/flow] \\
     [--release-ref <tag-or-sha>] \\
-    [--package-spec @arcforgelabs/flow@2026.10.50] \\
+    [--package-spec @arcforgelabs/<package>@<version>] \\
     [--notes-file /tmp/notes.md] \\
     [--output-root evidence]
 
@@ -23,8 +22,8 @@ Runs file format, one run per line:
   <label> <owner/repo> <run-id> <blocking|advisory>
 
 Example:
-  full-release-validation arcforgelabs/flow 24972498713 blocking
-  release-publish arcforgelabs/flow 123456789 blocking
+  validate arcforgelabs/tools 24972498713 blocking
+  publish arcforgelabs/tools 123456789 blocking
 `);
 }
 
@@ -36,7 +35,7 @@ function parseArgs(argv) {
     notesFile: "",
     releaseId: "",
     runsFile: "",
-    sourceRepo: DEFAULT_SOURCE_REPO,
+    sourceRepo: "",
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -71,7 +70,7 @@ function parseArgs(argv) {
         args.outputRoot = next();
         break;
       case "--source-repo":
-        args.sourceRepo = next() || DEFAULT_SOURCE_REPO;
+        args.sourceRepo = next();
         break;
       default:
         throw new Error(`Unknown argument: ${arg}`);
@@ -87,7 +86,7 @@ function parseArgs(argv) {
     throw new Error("--release-id must contain only letters, numbers, dot, underscore, or dash");
   }
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(args.sourceRepo)) {
-    throw new Error("--source-repo must be owner/repo");
+    throw new Error("--source-repo is required as owner/repo");
   }
   return args;
 }

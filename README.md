@@ -13,8 +13,15 @@ The source of truth stays in each product repository:
 - npm publish workflow
 
 This repo keeps durable release evidence separate from the product source
-repositories. One ledger serves every product, as upstream records OpenClaw and
-Octopool in one ledger.
+repositories. One ledger serves every side product, as upstream records Octopool.
+
+Upstream OpenClaw core stopped writing ledger records after `2026.7.2-beta.4`
+(July 2026). Its proof now stays in the product repository: the Full Release
+Validation summary, its Actions artifacts and the dependency evidence asset on
+the GitHub release. Its ledger dispatch is opt-in and off by default. Flow
+follows that direction: it keeps its proof on its own GitHub release
+(`postpublish-evidence.json`) and does not write here. Side products without a
+validation pipeline of their own, such as the plugin marketplace, record here.
 
 ## Workflows
 
@@ -25,8 +32,6 @@ Octopool in one ledger.
 - `.github/workflows/arcforge-release-evidence.yml` records manually supplied
   release proof runs. A product release workflow can send the same fields as a
   `arcforge_release_completed` repository dispatch.
-- `.github/workflows/arcforge-release-evidence-from-full-validation.yml` ingests
-  a product's completed Full Release Validation run and the child runs it logs.
 
 The scripts use only Node.js built-ins and the Python standard library; no
 dependency installation or build step is needed. Run local checks with Node.js 24
@@ -34,15 +39,13 @@ and Python 3:
 
 ```bash
 node --check scripts/arcforge-release-evidence.mjs
-node --check scripts/arcforge-release-evidence-from-full-validation.mjs
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 ```
 
 ## Release Evidence
 
-The evidence workflows write release summaries under `evidence/<release-id>/`.
-A release id names the product, then the version or commit: `flow-2026.10.50`,
-`explainer-0.1.9`. Each evidence directory contains:
+The evidence workflow writes release summaries under `evidence/<release-id>/`.
+A release id names the product, then the version or commit: `explainer-0.1.10`. Each evidence directory contains:
 
 - `release-evidence.md`
 - `release-evidence.json`
@@ -57,9 +60,9 @@ Evidence records do not store raw logs, provider payloads, live-channel
 transcripts, signing material, credentials, environment dumps, or downloaded
 release artifacts.
 
-Both evidence workflows publish with checkout-managed ephemeral `GITHUB_TOKEN`
-credentials and `contents:write`; they do not require a persistent push PAT.
-Both writers run from `main`, share a per-release concurrency group, and verify
+The evidence workflow publishes with checkout-managed ephemeral `GITHUB_TOKEN`
+credentials and `contents:write`; it does not require a persistent push PAT.
+The writer runs from `main`, uses a per-release concurrency group, and verify
 that the complete generated evidence directory is byte-identical on `origin/main`.
 Unrelated concurrent commits can be rebased; changes within the same evidence
 directory fail with a request to regenerate from current main. Even an unchanged
@@ -78,15 +81,13 @@ Manual evidence input format:
 Example:
 
 ```text
-full-release-validation arcforgelabs/flow 40623344137 blocking
-release-publish arcforgelabs/flow 40623781617 blocking
-npm-release arcforgelabs/flow 40624353482 blocking
+marketplace-release arcforgelabs/tools <run-id> blocking
+marketplace-sync arcforgelabs/marketplace <run-id> advisory
 ```
 
 ```bash
 gh workflow run arcforge-release-evidence.yml --repo arcforgelabs/releases --ref main \
-  -f release_id=flow-2026.10.50 -f source_repo=arcforgelabs/flow \
-  -f release_ref=v2026.10.50 -f package_spec=@arcforgelabs/flow@2026.10.50 \
+  -f release_id=explainer-0.1.10 -f source_repo=arcforgelabs/marketplace \
   -f runs="$(cat runs.txt)"
 ```
 
@@ -97,8 +98,8 @@ fail the release by itself.
 ### Dispatch from a product
 
 A product sends a repository dispatch to this repository with secret
-`ARCFORGE_RELEASES_DISPATCH_TOKEN`, as upstream's Full Release Validation does
-with `OPENCLAW_RELEASES_DISPATCH_TOKEN`. The
+`ARCFORGE_RELEASES_DISPATCH_TOKEN`, as upstream does with
+`OPENCLAW_RELEASES_DISPATCH_TOKEN`. The
 secret is a fine-grained token with Contents read and write on
 `arcforgelabs/releases` only. A product without the secret skips the dispatch
 with a warning and prints the manual command; the dispatch never fails a
@@ -106,27 +107,7 @@ product release.
 
 | Event type | Workflow | `client_payload` |
 | --- | --- | --- |
-| `arcforge_full_release_validation_completed` | From Full Validation | `full_validation_run_id`, `release_id`, `source_repo`, optional `release_ref`, `package_spec`, `notes` |
 | `arcforge_release_completed` | Release Evidence | `release_id`, `source_repo`, `runs`, optional `release_ref`, `package_spec`, `notes` |
-
-### Full Validation Ingest
-
-`Arc Forge Release Evidence From Full Validation` takes a completed Full
-Release Validation run id from the source repository, reads that parent run's
-logs, extracts child run ids from `Dispatched <workflow>.yml: <run url>` lines,
-and writes the same evidence directory shape. Lanes that run inside the parent
-run as reusable workflows are proved by the parent run's result.
-
-```bash
-gh workflow run arcforge-release-evidence-from-full-validation.yml \
-  --repo arcforgelabs/releases \
-  --ref main \
-  -f full_validation_run_id=40623344137 \
-  -f release_id=flow-2026.10.50 \
-  -f source_repo=arcforgelabs/flow \
-  -f release_ref=v2026.10.50 \
-  -f package_spec=@arcforgelabs/flow@2026.10.50
-```
 
 ## Storage Policy
 
@@ -150,11 +131,10 @@ public GitHub release when they are intended for users.
 
 | Upstream | Here | Reason |
 | --- | --- | --- |
-| One source repository, `openclaw/openclaw` | `--source-repo` / `source_repo`, default `arcforgelabs/flow` | Arc Forge has several products and no single source repository. |
+| One source repository, `openclaw/openclaw` | `--source-repo` / `source_repo`, required | Arc Forge has several products and no single source repository. |
 | Package specs must be `openclaw` | Package specs must be in `@arcforgelabs/` | Arc Forge publishes under its npm scope. |
-| Full validation parent must be named `Full Release Validation` | Its file must end in `full-release-validation.yml` | Products name the workflow after themselves and set a `run-name`, so the API name is the run title. |
-| Child runs come from a fixed list of OpenClaw workflows | Any `Dispatched <workflow>.yml` line for the source repository | Each product has its own child workflows. |
-| Release Evidence is dispatch-only by hand | It also accepts `arcforge_release_completed` | Products without a Full Release Validation parent (the marketplace) record themselves. |
+| Evidence From Full Validation workflow | Left out | Upstream core no longer writes the ledger by default; Flow keeps its proof on its own GitHub release, the same way. |
+| Release Evidence is dispatch-only by hand | It also accepts `arcforge_release_completed` | The marketplace release records itself, as Octopool's records arrive without a person. |
 | Product performance metrics in the record | Left out | Only OpenClaw produces `openclaw-performance-*` artifacts. |
 | macOS validate, publish and variant workflows | Left out | Arc Forge has no macOS app. |
 | CI exercises pnpm, caches and artifacts on Linux and macOS | CI checks scripts and runs tests on Linux | Those round trips prove the macOS packaging runners, which are left out. |

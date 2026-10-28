@@ -8,9 +8,8 @@ on:
         required: true
         type: string
       source_repo:
-        description: Product repository that owns the release ref
-        required: false
-        default: arcforgelabs/flow
+        description: Product repository that owns the release ref, for example arcforgelabs/marketplace
+        required: true
         type: string
       release_ref:
         description: Optional release ref, tag, branch, or SHA in the source repository
@@ -18,7 +17,7 @@ on:
         default: ""
         type: string
       package_spec:
-        description: Optional package spec covered by this evidence, for example @arcforgelabs/flow@2026.10.50
+        description: Optional @arcforgelabs package spec covered by this evidence
         required: false
         default: ""
         type: string
@@ -31,8 +30,7 @@ on:
         required: false
         default: ""
         type: string
-  # A product release workflow sends the same fields as client_payload, so a
-  # product without a Full Release Validation parent still records itself.
+  # A product release workflow sends the same fields as client_payload.
   repository_dispatch:
     types:
       - arcforge_release_completed

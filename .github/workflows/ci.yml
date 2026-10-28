@@ -27,7 +27,6 @@ jobs:
       - name: Check scripts
         run: |
           node --check scripts/arcforge-release-evidence.mjs
-          node --check scripts/arcforge-release-evidence-from-full-validation.mjs
           bash -n scripts/publish-release-evidence.sh
 
       - name: Run workflow regression tests

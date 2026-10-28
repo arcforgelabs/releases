@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOWS = ('arcforge-release-evidence.yml', 'arcforge-release-evidence-from-full-validation.yml')
+WORKFLOWS = ('arcforge-release-evidence.yml',)
 
 
 def git(cwd, *args):
